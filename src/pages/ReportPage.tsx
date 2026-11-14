@@ -1,0 +1,32 @@
+import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { endOfMonth, format, isWithinInterval, startOfMonth, subMonths } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Download, Printer } from 'lucide-react'
+import { db } from '../db'
+import { calculateSessionVolume, formatVolume } from '../utils/calculations'
+import { downloadFile, toCsv } from '../utils/export'
+import { PageHeader, Stat } from '../components/ui'
+
+export function ReportPage({onBack}:{onBack:()=>void}){
+  const [month,setMonth]=useState(format(new Date(),'yyyy-MM'))
+  const data=useLiveQuery(async()=>{
+    const start=startOfMonth(new Date(month+'-01T12:00:00')),end=endOfMonth(start),prevStart=startOfMonth(subMonths(start,1)),prevEnd=endOfMonth(prevStart),inside=(date:string,a=start,b=end)=>isWithinInterval(new Date(date),{start:a,end:b})
+    const [sessions,sets,measurements,cardio,health,records,exercises]=await Promise.all([db.workoutSessions.toArray(),db.performedSets.toArray(),db.bodyMeasurements.orderBy('date').toArray(),db.cardioSessions.toArray(),db.healthLogs.toArray(),db.personalRecords.toArray(),db.exercises.toArray()])
+    const monthSessions=sessions.filter(s=>s.status==='completed'&&inside(s.finishedAt||s.startedAt)),ids=new Set(monthSessions.map(s=>s.id)),monthSets=sets.filter(s=>ids.has(s.sessionId)),monthMeasurements=measurements.filter(m=>inside(m.date+'T12:00:00')),monthCardio=cardio.filter(c=>inside(c.date+'T12:00:00')),prevCardio=cardio.filter(c=>inside(c.date+'T12:00:00',prevStart,prevEnd)),monthHealth=health.filter(h=>inside(h.date+'T12:00:00')),monthRecords=records.filter(r=>inside(r.achievedAt))
+    const avg=(values:(number|undefined)[])=>{const clean=values.filter((v):v is number=>v!=null);return clean.length?clean.reduce((a,b)=>a+b,0)/clean.length:null},first=monthMeasurements[0],last=monthMeasurements.at(-1)
+    const progression=[...new Set(monthSets.map(s=>s.exerciseId))].map(exerciseId=>{const exercise=exercises.find(e=>e.id===exerciseId),items=monthSets.filter(s=>s.exerciseId===exerciseId&&s.completed&&!s.warmup).sort((a,b)=>(a.completedAt||'').localeCompare(b.completedAt||''));return {name:exercise?.name||items[0]?.exerciseName,first:items[0]?.weight,last:items.at(-1)?.weight}}).filter(x=>x.first!=null).slice(0,5)
+    return {sessions:monthSessions.length,volume:calculateSessionVolume(monthSets),frequency:monthSessions.length/(end.getDate()/7),records:monthRecords.length,first,last,cardioMinutes:monthCardio.reduce((n,c)=>n+c.durationMinutes,0),cardioSessions:monthCardio.length,prevCardioMinutes:prevCardio.reduce((n,c)=>n+c.durationMinutes,0),sleep:avg(monthHealth.map(h=>h.sleepHours)),fatigue:avg(monthHealth.map(h=>h.fatigue)),progression}
+  },[month])
+  const diff=(key:'weightKg'|'waistCm'|'abdomenCm'|'rightArmCm'|'chestCm'|'rightThighCm')=>{const a=data?.first?.[key],b=data?.last?.[key];return a!=null&&b!=null?b-a:null}
+  const exportCsv=()=>{if(!data)return;const rows=[{categoria:'Treinamento',metrica:'Sessões',valor:data.sessions},{categoria:'Treinamento',metrica:'Volume total (kg)',valor:data.volume},{categoria:'Treinamento',metrica:'Recordes',valor:data.records},{categoria:'Medidas',metrica:'Variação de peso (kg)',valor:diff('weightKg')},{categoria:'Medidas',metrica:'Variação de cintura (cm)',valor:diff('waistCm')},{categoria:'Medidas',metrica:'Variação abdominal (cm)',valor:diff('abdomenCm')},{categoria:'Cardio',metrica:'Minutos',valor:data.cardioMinutes},{categoria:'Recuperação',metrica:'Média de sono (h)',valor:data.sleep},{categoria:'Recuperação',metrica:'Média de fadiga',valor:data.fatigue}];downloadFile('\ufeff'+toCsv(rows),`gymtrack-relatorio-${month}.csv`,'text/csv;charset=utf-8')}
+  return <div><PageHeader title="Relatório mensal" subtitle="Resumo descritivo dos registros do período." back={onBack} action={<div className="no-print flex gap-2"><button className="btn-secondary !px-3" onClick={exportCsv}><Download size={17}/></button><button className="btn-primary !px-3" onClick={()=>window.print()}><Printer size={17}/></button></div>}/><label className="no-print mb-4 block"><span className="label">Mês</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
+    <h2 className="mb-3 text-xl font-bold capitalize">{format(new Date(month+'-01T12:00:00'),'MMMM yyyy',{locale:ptBR})}</h2>
+    <ReportSection title="Treinamento"><div className="grid grid-cols-2 gap-4 lg:grid-cols-4"><Stat label="Sessões" value={data?.sessions??'—'}/><Stat label="Frequência semanal" value={data?`${data.frequency.toFixed(1)}×`:'—'}/><Stat label="Volume total" value={data?formatVolume(data.volume):'—'}/><Stat label="Novos recordes" value={data?.records??'—'}/></div>{data?.progression.length?<div className="mt-4 border-t border-line pt-3"><p className="label">Principais exercícios</p>{data.progression.map(p=><p key={p.name} className="text-sm">{p.name}: <b>{p.first} kg → {p.last} kg</b></p>)}</div>:null}</ReportSection>
+    <ReportSection title="Medidas"><div className="grid grid-cols-2 gap-4 lg:grid-cols-3">{[['Peso',diff('weightKg'),'kg'],['Cintura',diff('waistCm'),'cm'],['Abdômen',diff('abdomenCm'),'cm'],['Braço direito',diff('rightArmCm'),'cm'],['Peito',diff('chestCm'),'cm'],['Coxa direita',diff('rightThighCm'),'cm']].map(([label,value,unit])=><Stat key={String(label)} label={String(label)} value={value==null?'Sem dados':`${Number(value)>=0?'+':''}${Number(value).toFixed(1)} ${unit}`}/>)}</div></ReportSection>
+    <ReportSection title="Cardio"><div className="grid grid-cols-2 gap-4 lg:grid-cols-3"><Stat label="Minutos totais" value={`${data?.cardioMinutes??0} min`}/><Stat label="Sessões" value={data?.cardioSessions??0}/><Stat label="Vs. mês anterior" value={data?`${data.cardioMinutes-data.prevCardioMinutes>=0?'+':''}${data.cardioMinutes-data.prevCardioMinutes} min`:'—'}/></div></ReportSection>
+    <ReportSection title="Recuperação"><div className="grid grid-cols-2 gap-4"><Stat label="Média de sono" value={data?.sleep!=null?`${data.sleep.toFixed(1)} h`:'Sem dados'}/><Stat label="Média de fadiga" value={data?.fatigue!=null?`${data.fatigue.toFixed(1)}/5`:'Sem dados'}/></div></ReportSection>
+    <p className="mt-4 text-xs text-muted">Este relatório não atribui efeitos causais a suplementos ou medicamentos. Para interpretação clínica, procure acompanhamento médico.</p>
+  </div>
+}
+function ReportSection({title,children}:{title:string;children:React.ReactNode}){return <section className="card mb-4"><h3 className="eyebrow mb-4">{title}</h3>{children}</section>}

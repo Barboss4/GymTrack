@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background: #090d0c; color: #f4f7f6; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 80% -10%, #193128 0, transparent 32rem), #090d0c; }
+button, input, select, textarea { font: inherit; }
+button { touch-action: manipulation; }
+input, select, textarea { background: #0b110f; border: 1px solid #2a3833; border-radius: .75rem; color: white; padding: .75rem; width: 100%; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: #c8ff32; box-shadow: 0 0 0 2px rgb(200 255 50 / .12); }
+input[type="checkbox"] { width: 1.35rem; height: 1.35rem; accent-color: #c8ff32; }
+@layer components {
+  .card { @apply rounded-2xl border border-line bg-panel/95 p-4 shadow-lg shadow-black/10; }
+  .btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40; }
+  .btn-primary { @apply btn bg-lime text-ink hover:bg-[#d7ff68]; }
+  .btn-secondary { @apply btn border border-line bg-[#17211e] text-white hover:border-[#40534c]; }
+  .btn-danger { @apply btn border border-red-900/70 bg-red-950/40 text-red-300; }
+  .label { @apply mb-1 block text-xs font-medium uppercase tracking-wider text-muted; }
+  .eyebrow { @apply text-xs font-bold uppercase tracking-[.18em] text-lime; }
+  .metric { @apply text-2xl font-bold tracking-tight; }
+}
+.recharts-text { fill: #91a09b; font-size: 11px; }
+@media print { nav, .no-print, button { display: none !important; } body { background: white; color: black; } .card { border: 1px solid #ddd; background: white; box-shadow: none; break-inside: avoid; } }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calculateNewRecordTypes, calculateSessionVolume, calculateSetVolume, estimateOneRepMax, percentageChange, shouldSuggestLoadIncrease } from '../utils/calculations'
+import { buildTempoPhases, normalizeTempoConfig } from '../utils/tempo'
 
 describe('cálculos de treino', () => {
   it('calcula volume e ignora aquecimento ou série incompleta', () => {
@@ -28,5 +29,18 @@ describe('cálculos de treino', () => {
     const records = calculateNewRecordTypes({weight:42,reps:10},[{weight:40,reps:10},{weight:42,reps:8}])
     expect(records.map(r=>r.type)).toEqual(['estimated1rm'])
     expect(calculateNewRecordTypes({weight:45,reps:10},[{weight:42,reps:12}]).map(r=>r.type)).toEqual(['weight','estimated1rm'])
+  })
+})
+
+describe('guia de cadência', () => {
+  it('monta as fases começando pela descida e ignora pausas zeradas', () => {
+    const phases = buildTempoPhases({downSeconds:3,bottomPauseSeconds:0,upSeconds:1,topPauseSeconds:0,reps:10,startWith:'down'})
+    expect(phases.map(phase => phase.label)).toEqual(['DESCER','SUBIR'])
+    expect(phases.map(phase => phase.durationSeconds)).toEqual([3,1])
+  })
+  it('permite começar pela subida e limita valores inválidos', () => {
+    const config = normalizeTempoConfig({downSeconds:99,bottomPauseSeconds:-2,upSeconds:0,topPauseSeconds:1,reps:80,startWith:'up'})
+    expect(config).toMatchObject({downSeconds:10,bottomPauseSeconds:0,upSeconds:.5,reps:50,startWith:'up'})
+    expect(buildTempoPhases(config).map(phase => phase.label)).toEqual(['SUBIR','PAUSA EM CIMA','DESCER'])
   })
 })

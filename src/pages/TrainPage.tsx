@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowDown, ArrowUp, Check, CirclePause, CirclePlay, Clock3, Flame, Pause, Play, Plus, RefreshCcw, RotateCcw, SkipForward, Square, Trash2, Trophy } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, CirclePause, CirclePlay, Clock3, Flame, Pause, Play, Plus, RefreshCcw, RotateCcw, SkipForward, Square, Timer, Trash2, Trophy } from 'lucide-react'
 import { db } from '../db'
 import type { Exercise, PerformedSet, PlannedExercise, WorkoutDay, WorkoutSession } from '../types'
 import { calculateNewRecordTypes, calculateSessionVolume, durationMinutes, formatVolume, shouldSuggestLoadIncrease } from '../utils/calculations'
 import { newId, nowIso } from '../utils/ids'
 import { EmptyState, Modal, PageHeader } from '../components/ui'
+import { TempoCoach } from '../components/TempoCoach'
 
 export function TrainPage({ requestedDayId, onRequestedHandled, onFinished }: { requestedDayId?: string; onRequestedHandled: () => void; onFinished: (sessionId: string) => void }) {
   const [starting, setStarting] = useState(false)
@@ -65,6 +66,7 @@ function SessionRunner({ sessionId, onFinished }: { sessionId: string; onFinishe
   const exercises = useLiveQuery(() => db.exercises.toArray(), [])
   const [showFinish, setShowFinish] = useState(false)
   const [showSubstitute, setShowSubstitute] = useState<{ exerciseId: string; name: string } | null>(null)
+  const [tempoExercise, setTempoExercise] = useState<{ name: string; reps: number } | null>(null)
   const [timer, setTimer] = useState<{ endAt: number; total: number; pausedRemaining?: number } | null>(() => {
     const stored = localStorage.getItem(`gymtrack-timer-${sessionId}`); return stored ? JSON.parse(stored) : null
   })
@@ -156,7 +158,7 @@ function SessionRunner({ sessionId, onFinished }: { sessionId: string; onFinishe
           <div className="space-y-2">{group.map(set => <div key={set.id} className={`grid grid-cols-[54px_1fr_1fr_74px_52px_40px] items-center gap-2 rounded-xl p-1 ${set.completed ? 'bg-lime/5' : ''}`}><span className={`text-center text-xs font-bold ${set.warmup ? 'text-amber-300' : 'text-muted'}`}>{set.warmup ? 'AQ' : set.setOrder}</span><input type="number" min="0" step="0.5" value={set.weight || ''} onChange={e => updateSet(set.id,{weight:Number(e.target.value)})} aria-label={`Peso série ${set.setOrder}`} /><input type="number" min="0" value={(exercise?.mode === 'isometric' ? set.durationSeconds : set.reps) || ''} onChange={e => updateSet(set.id, exercise?.mode === 'isometric' ? {durationSeconds:Number(e.target.value), reps: 0} : {reps:Number(e.target.value)})} aria-label="Repetições ou duração" /><input type="number" min="0" max="10" value={set.rir ?? ''} onChange={e => updateSet(set.id,{rir:e.target.value === '' ? undefined : Number(e.target.value)})} aria-label="RIR" /><button onClick={() => toggleDone(set)} className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl border ${set.completed ? 'border-lime bg-lime text-ink' : 'border-line text-muted'}`}><Check size={20}/></button><button className="text-muted hover:text-red-300" disabled={group.length <= 1} onClick={() => db.performedSets.delete(set.id)}><Trash2 size={17}/></button></div>)}</div>
         </div></div>
         {suggest && <div className="mx-4 mb-3 flex gap-2 rounded-xl bg-lime/10 p-3 text-sm text-lime"><Trophy className="shrink-0" size={18}/><span>Você completou todas as séries no limite superior. Considere aumentar {exercise?.loadIncrement || 1} kg no próximo treino.</span></div>}
-        <div className="flex flex-wrap gap-2 border-t border-line p-3"><button className="btn-secondary !min-h-9 !px-3 !py-1 text-xs" onClick={() => addSet(group)}><Plus size={15}/> Série</button><button className="btn-secondary !min-h-9 !px-3 !py-1 text-xs" onClick={() => addSet(group,true)}><Flame size={15}/> Aquecimento</button><button className="btn-secondary !min-h-9 !px-3 !py-1 text-xs" onClick={() => setShowSubstitute({exerciseId:base.exerciseId,name:base.exerciseName})}><RefreshCcw size={15}/> Substituir</button></div>
+        <div className="flex flex-wrap gap-2 border-t border-line p-3"><button className="btn-secondary !min-h-9 !px-3 !py-1 text-xs" onClick={() => addSet(group)}><Plus size={15}/> Série</button><button className="btn-secondary !min-h-9 !px-3 !py-1 text-xs" onClick={() => addSet(group,true)}><Flame size={15}/> Aquecimento</button>{exercise?.mode !== 'isometric' && <button className="btn-secondary !min-h-9 !px-3 !py-1 text-xs" onClick={() => setTempoExercise({name:base.exerciseName,reps:plan?.minReps||10})}><Timer size={15}/> Cadência</button>}<button className="btn-secondary !min-h-9 !px-3 !py-1 text-xs" onClick={() => setShowSubstitute({exerciseId:base.exerciseId,name:base.exerciseName})}><RefreshCcw size={15}/> Substituir</button></div>
       </section>
     })}</div>
 
@@ -166,6 +168,7 @@ function SessionRunner({ sessionId, onFinished }: { sessionId: string; onFinishe
     {remaining > 0 && <RestTimer remaining={remaining} timer={timer!} onPause={() => setTimer(t => t ? t.pausedRemaining != null ? {...t, endAt: Date.now()+t.pausedRemaining*1000, pausedRemaining:undefined} : {...t, pausedRemaining:Math.max(1,Math.ceil((t.endAt-Date.now())/1000))} : t)} onReset={() => setTimer(t => t ? {...t,endAt:Date.now()+t.total*1000,pausedRemaining:undefined}:t)} onAdd={() => setTimer(t => t ? t.pausedRemaining != null ? {...t,pausedRemaining:t.pausedRemaining+15}:{...t,endAt:t.endAt+15000}:t)} onSkip={() => setTimer(null)} />}
     {showFinish && <Modal title="Finalizar treino?" onClose={() => setShowFinish(false)}><div className="grid grid-cols-3 gap-2 text-center"><div className="card !p-3"><p className="text-xs text-muted">Duração</p><b>{durationMinutes(session.startedAt, undefined, session.totalPausedMs)} min</b></div><div className="card !p-3"><p className="text-xs text-muted">Séries</p><b>{completedCount}</b></div><div className="card !p-3"><p className="text-xs text-muted">Volume</p><b>{formatVolume(volume)}</b></div></div>{sets.some(s=>!s.completed)&&<p className="mt-3 text-sm text-amber-300">Há séries não concluídas. Elas serão preservadas, mas não entram nos cálculos.</p>}<div className="mt-5 flex gap-2"><button className="btn-secondary flex-1" onClick={()=>setShowFinish(false)}>Continuar</button><button className="btn-primary flex-1" onClick={finish}>Finalizar</button></div></Modal>}
     {showSubstitute && <Modal title={`Substituir ${showSubstitute.name}`} onClose={() => setShowSubstitute(null)}><div className="max-h-80 space-y-2 overflow-y-auto">{exercises?.filter(e=>!e.archived&&e.id!==showSubstitute.exerciseId).map(e=><button key={e.id} onClick={()=>substitute(e)} className="w-full rounded-xl border border-line p-3 text-left hover:border-lime"><b>{e.name}</b><p className="text-xs text-muted">{e.muscleGroup}</p></button>)}</div></Modal>}
+    {tempoExercise && <TempoCoach exerciseName={tempoExercise.name} initialReps={tempoExercise.reps} onClose={() => setTempoExercise(null)}/>} 
   </div>
 }
 

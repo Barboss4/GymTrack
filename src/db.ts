@@ -1,8 +1,8 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { BodyMeasurement, CardioSession, Exercise, HealthLog, LabResult, PerformedSet, PersonalRecord, PlannedExercise, Setting, SupplementLog, UserProfile, WorkoutDay, WorkoutProgram, WorkoutSession } from './types'
-import { defaultExercises, defaultPlannedExercises, defaultProfile, defaultProgram, defaultSettings, defaultWorkoutDays, v3Exercises, v3PlannedExercises, v4Exercises, v4PlannedExercises, v5Exercises, v5PlannedExercises } from './data/defaults'
+import { defaultExercises, defaultPlannedExercises, defaultProfile, defaultProgram, defaultSettings, defaultWorkoutDays, v3Exercises, v3PlannedExercises, v4Exercises, v4PlannedExercises, v5Exercises, v5PlannedExercises, v6PlannedExercises } from './data/defaults'
 
-export const DB_VERSION = 5
+export const DB_VERSION = 6
 
 export class GymTrackDatabase extends Dexie {
   userProfile!: EntityTable<UserProfile, 'id'>
@@ -77,6 +77,20 @@ export class GymTrackDatabase extends Dexie {
       if (previous?.exerciseId === 'terra-romeno') {
         await plannedExercises.delete(previous.id)
         for (const planned of v5PlannedExercises) if (!await plannedExercises.get(planned.id)) await plannedExercises.add(planned)
+      }
+    })
+    this.version(6).stores({
+      userProfile: 'id', exercises: 'id, name, muscleGroup, archived', workoutPrograms: 'id, active',
+      workoutDays: 'id, programId, weekday, order', plannedExercises: 'id, workoutDayId, exerciseId, order',
+      workoutSessions: 'id, workoutDayId, startedAt, finishedAt, status', performedSets: 'id, sessionId, exerciseId, [sessionId+exerciseId], completedAt, warmup',
+      bodyMeasurements: 'id, date', cardioSessions: 'id, date', supplementLogs: 'id, date, name',
+      healthLogs: 'id, date', labResults: 'id, date, name', personalRecords: 'id, exerciseId, sessionId, type, achievedAt', settings: 'id, &key'
+    }).upgrade(async tx => {
+      const plannedExercises = tx.table('plannedExercises')
+      const pushExercises = await plannedExercises.where('workoutDayId').equals('push-a').toArray()
+      if (!pushExercises.some(planned => planned.exerciseId === 'crucifixo-cabo')) {
+        await Promise.all(pushExercises.filter(planned => planned.order >= 2).map(planned => plannedExercises.update(planned.id, { order: planned.order + 1 })))
+        for (const planned of v6PlannedExercises) await plannedExercises.add(planned)
       }
     })
   }

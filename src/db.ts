@@ -1,8 +1,8 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { BodyMeasurement, CardioSession, Exercise, HealthLog, LabResult, PerformedSet, PersonalRecord, PlannedExercise, Setting, SupplementLog, UserProfile, WorkoutDay, WorkoutProgram, WorkoutSession } from './types'
-import { defaultExercises, defaultPlannedExercises, defaultProfile, defaultProgram, defaultSettings, defaultWorkoutDays } from './data/defaults'
+import { defaultExercises, defaultPlannedExercises, defaultProfile, defaultProgram, defaultSettings, defaultWorkoutDays, v3Exercises, v3PlannedExercises } from './data/defaults'
 
-export const DB_VERSION = 2
+export const DB_VERSION = 3
 
 export class GymTrackDatabase extends Dexie {
   userProfile!: EntityTable<UserProfile, 'id'>
@@ -38,6 +38,18 @@ export class GymTrackDatabase extends Dexie {
     }).upgrade(async tx => {
       await tx.table('workoutSessions').toCollection().modify(session => { if (session.totalPausedMs == null) session.totalPausedMs = 0 })
       await tx.table('performedSets').toCollection().modify(set => { if (set.warmup == null) set.warmup = false })
+    })
+    this.version(3).stores({
+      userProfile: 'id', exercises: 'id, name, muscleGroup, archived', workoutPrograms: 'id, active',
+      workoutDays: 'id, programId, weekday, order', plannedExercises: 'id, workoutDayId, exerciseId, order',
+      workoutSessions: 'id, workoutDayId, startedAt, finishedAt, status', performedSets: 'id, sessionId, exerciseId, [sessionId+exerciseId], completedAt, warmup',
+      bodyMeasurements: 'id, date', cardioSessions: 'id, date', supplementLogs: 'id, date, name',
+      healthLogs: 'id, date', labResults: 'id, date, name', personalRecords: 'id, exerciseId, sessionId, type, achievedAt', settings: 'id, &key'
+    }).upgrade(async tx => {
+      const exercises = tx.table('exercises')
+      const plannedExercises = tx.table('plannedExercises')
+      for (const exercise of v3Exercises) if (!await exercises.get(exercise.id)) await exercises.add(exercise)
+      for (const planned of v3PlannedExercises) if (!await plannedExercises.get(planned.id)) await plannedExercises.add(planned)
     })
   }
 }

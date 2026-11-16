@@ -37,6 +37,7 @@ const seeds: ExerciseSeed[] = [
   ['extensao-punho-halteres', 'Extensão de punho com halteres', 'Antebraços', 1, 2, 15, 20],
   ['abdominal-bicicleta', 'Abdominal bicicleta', 'Abdômen', 0, 2, 15, 20],
   ['terra-romeno', 'Levantamento terra romeno', 'Posterior', 2.5, 3, 8, 10],
+  ['extensao-quadril-cabo', 'Extensão de quadril no cabo', 'Glúteos', 1, 3, 12, 15],
   ['agachamento-hack', 'Agachamento hack ou Smith', 'Quadríceps', 2.5, 3, 8, 12],
   ['cadeira-flexora', 'Cadeira flexora', 'Posterior', 2, 3, 10, 15],
   ['elevacao-pelvica', 'Elevação pélvica', 'Glúteos', 2.5, 3, 8, 12],
@@ -68,7 +69,7 @@ const daySeeds = [
   ['pull-a', 'PULL A', 2, 'Costas, deltoide posterior, bíceps, antebraços e abdômen', ['puxada-alta','remada-baixa','remada-unilateral','crucifixo-inverso','rosca-direta','rosca-martelo','rosca-inclinada-halteres','rosca-inversa-barra','elevacao-pernas']],
   ['legs-a', 'LEGS A', 3, 'Quadríceps, posterior, panturrilhas e abdômen', ['agachamento-livre','leg-press','cadeira-extensora','mesa-flexora','panturrilha-pe','abdominal-polia']],
   ['upper-b', 'UPPER B', 4, 'Parte superior completa, com ombros, braços, antebraços e abdômen', ['supino-maquina','puxada-neutra','remada-articulada','crucifixo-cabo','elevacao-lateral','rosca-scott','triceps-frances','desenvolvimento-maquina','extensao-punho-halteres','abdominal-bicicleta']],
-  ['lower-b', 'LOWER B', 5, 'Posterior, glúteos, quadríceps, panturrilhas e abdômen', ['terra-romeno','agachamento-hack','cadeira-flexora','elevacao-pelvica','panturrilha-sentada','prancha']]
+  ['lower-b', 'LOWER B', 5, 'Posterior, glúteos, quadríceps, panturrilhas e abdômen', ['extensao-quadril-cabo','agachamento-hack','cadeira-flexora','elevacao-pelvica','panturrilha-sentada','prancha']]
 ] as const
 
 export const defaultWorkoutDays: WorkoutDay[] = daySeeds.map(([id, name, weekday, focus], order) => stamp(id, { programId: defaultProgram.id, name, weekday, focus, order }))
@@ -86,6 +87,10 @@ export const v3PlannedExercises = defaultPlannedExercises.filter(planned => (v3E
 export const v4ExerciseIds = ['abdominal-supra-solo','elevacao-pernas','abdominal-bicicleta'] as const
 export const v4Exercises = defaultExercises.filter(exercise => (v4ExerciseIds as readonly string[]).includes(exercise.id))
 export const v4PlannedExercises = defaultPlannedExercises.filter(planned => (v4ExerciseIds as readonly string[]).includes(planned.exerciseId))
+
+export const v5ExerciseIds = ['extensao-quadril-cabo'] as const
+export const v5Exercises = defaultExercises.filter(exercise => (v5ExerciseIds as readonly string[]).includes(exercise.id))
+export const v5PlannedExercises = defaultPlannedExercises.filter(planned => (v5ExerciseIds as readonly string[]).includes(planned.exerciseId))
 
 export const defaultSettings: Setting[] = [
   stamp('setting-cardio-goal', { key: 'cardioWeeklyGoalMinutes', value: 75 }),
